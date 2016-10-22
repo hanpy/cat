@@ -87,7 +87,7 @@ class MLogin(object):
         data["addParam"] = self.extract_param("addParam", content3)
         data["cbaId"] = self.extract_param("cbaId", content3, "用户名不存在")
         data["cbaPw"] = self.extract_param("cbaPw", content3)
-        data["jobInfoValue"] = self.extract_param("jobInfoValue", content3)
+        data["jobInfoValue"] = self.extract_param("jobInfoValue", content3,"一级密码已经错误5次")
         data["OrgCode"] = self.extract_param("OrgCode", content3)
         data["pInfo"] = self.extract_param("pInfo", content3)
 
@@ -109,6 +109,8 @@ class MLogin(object):
         self.headers['Referer'] = 'https://cert.vno.co.kr/in.cb'
         response6 = self.request_url("https://cert.vno.co.kr/IPIN/inlogin.cb")
         content6 = response6.read().decode("euc-kr")
+        if '비밀번호 5회 오류' in content6:
+            raise RuntimeError("一级密码已经错误5次")
         data = dict()
         data["CLIENTKEY"] = self.extract_param("CLIENTKEY", content6, "一级密码错误")
         data["ukey"] = self.extract_param("ukey", content6)
@@ -119,7 +121,9 @@ class MLogin(object):
         response7 = self.request_url("https://cert.vno.co.kr/IPIN/add_auth_login_proc.cb", data)
         content7 = response7.read().decode("euc-kr")
         if "입력하신 2차비밀번호가 1회 일치하지 않습니다" in content7:
-            raise RuntimeError("登陆失败，提示二次密码不正确")
+            raise RuntimeError("登陆失败，提示两次密码不一致，请检查二级密码")
+        if "2차 비밀번호 입력을 5회 이상 실패 하셨습니다" in content7:
+            raise RuntimeError("登陆失败,二级密码已经错误5次")
         if "지금변경하기" in content7:
             # 提示更改密码,判断为登录成功
             print "登陆成功"
