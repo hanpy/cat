@@ -61,10 +61,6 @@ class MLogin(object):
         pInfo = self.extract_param("pInfo", self.init_content)
         retUrl = self.extract_param("retUrl", self.init_content)
         addParam = self.extract_param("addParam", self.init_content)
-        if DEBUG:
-            verify_code = raw_input("请输入验证码:")
-        else:
-            verify_code = self.verify_code
         data = {"cbaId": username, "cbaPw": pwd1, "captchaAnswer_enc": verify_code,
                 "pInfo": pInfo, "retUrl": retUrl, "addParam": addParam}
         self.headers['Referer'] = 'https://ipin.siren24.com/i-PINM2/jsp/ipin2_j21.jsp?id=86896E62A25FB6A41157DE4C5B9DF9E1&reqNum=020201D5F6ABAE130E196F74323599D6&retUrl=23http://www.siren24.com/mysiren/member/auth/auth02p_IpinResult.jsp&ipSeq=&domSeq=7805FC8599D3C93B658CAF8D8DBC08C5&urlSeq=DB3255CAF5E621672E4306B34C86EA09&addParam=|SIR001|GCT01'
