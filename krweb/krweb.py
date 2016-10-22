@@ -49,15 +49,15 @@ class MLogin(object):
             raise RuntimeError("无法解析参数%s %s" % (key, msg))
         return m.group(1)
 
-    def login(self,usename, pwd1, pwd2, verify_code):
+    def login(self,username, pwd1, pwd2, verify_code):
         try:
-            self._do_login(usename, pwd1, pwd2, verify_code)
+            self._do_login(username, pwd1, pwd2, verify_code)
             return True
         except Exception as e:
             print e.message
             return False
 
-    def _do_login(self,usename, pwd1, pwd2, verify_code):
+    def _do_login(self,username, pwd1, pwd2, verify_code):
         pInfo = self.extract_param("pInfo", self.init_content)
         retUrl = self.extract_param("retUrl", self.init_content)
         addParam = self.extract_param("addParam", self.init_content)
@@ -65,7 +65,7 @@ class MLogin(object):
             verify_code = raw_input("请输入验证码:")
         else:
             verify_code = self.verify_code
-        data = {"cbaId": usename, "cbaPw": pwd1, "captchaAnswer_enc": verify_code,
+        data = {"cbaId": username, "cbaPw": pwd1, "captchaAnswer_enc": verify_code,
                 "pInfo": pInfo, "retUrl": retUrl, "addParam": addParam}
         self.headers['Referer'] = 'https://ipin.siren24.com/i-PINM2/jsp/ipin2_j21.jsp?id=86896E62A25FB6A41157DE4C5B9DF9E1&reqNum=020201D5F6ABAE130E196F74323599D6&retUrl=23http://www.siren24.com/mysiren/member/auth/auth02p_IpinResult.jsp&ipSeq=&domSeq=7805FC8599D3C93B658CAF8D8DBC08C5&urlSeq=DB3255CAF5E621672E4306B34C86EA09&addParam=|SIR001|GCT01'
         response3 = self.request_url('https://ipin.siren24.com/i-PINM2/jsp/ipin2_j21_dup.jsp', data)
@@ -140,8 +140,8 @@ def init_url():
         print e.message
         return None
 
-def login(usename, pwd1, pwd2, verify_code):
-    return glb_m.login(usename,pwd1=pwd1,pwd2=pwd2,verify_code=verify_code)
+def login(username, pwd1, pwd2, verify_code):
+    return glb_m.login(username,pwd1=pwd1,pwd2=pwd2,verify_code=verify_code)
 
 
 if __name__ == "__main__":
@@ -149,7 +149,12 @@ if __name__ == "__main__":
     sys.setdefaultencoding('utf-8')
     DEBUG = True
     jsessionid = init_url()
-    isLogin = login(usename="wptls8208",pwd1="13565asd!",pwd2="13565asd",verify_code="")
+    username = raw_input("请输入账号:")
+    pwd1 = raw_input("请输入一级密码:")
+    pwd2 = raw_input("请输入二级密码:")
+    verify_code = raw_input("请输入验证码:")
+    # isLogin = login(usename="syc1989",pwd1="dudckddl2@",pwd2="dudckddl2",verify_code="")
+    isLogin = login(username=username, pwd1=pwd1, pwd2=pwd2, verify_code=verify_code)
     if isLogin:
         print "测试登陆成功."
     else:
