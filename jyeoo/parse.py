@@ -49,6 +49,7 @@ class Parser():
                 m = re.search(ur'<a.*?href="http://www\.jyeoo\.com/.*?".*?>(（.*?•.*?）)</a>', div, re.S)
                 if m:
                     content = m.group(1)
+                    result["zhentidiqu"]=content
                     repl = m.group()
                     question = question.replace(repl, content)
                 # 匹配所有图片,并下载图片,以UUID命名保存在相对路径下,图片字段多张图片使用逗号拼接
