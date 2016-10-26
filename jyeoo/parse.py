@@ -27,15 +27,15 @@ class Parser():
         self.dispatch_file = ""
 
 
-    def parse(self, url):
+    def parse(self, url, get_page=False):
         #url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=2&dg=3&fg=16&po=0&pd=1&pi=1&r=0.6531368879266407"
         text = self.while_request(url, req_retry=5)
         all = re.findall(ur'<fieldset.*?>(.*?)</fieldset>(<span class="fieldtip">.*?下载</a></span>)', text, re.S)
+        ret = list()
         if len(all) == 0:
             Log.error("没有匹配到任何题目相关.%s"%url)
             #这种要做个记录，后续手动查看为什么没有匹配到，是不是正则有问题还是确实没有？！
-            return
-        ret = list()
+            return ret
         for div, span in all:
             # div 是题目和选项　span是查看解析/难度/真题/组卷
             #print "原始题干DIV:", div
@@ -49,7 +49,7 @@ class Parser():
                 m = re.search(ur'<a.*?href="http://www\.jyeoo\.com/.*?".*?>(（.*?•.*?）)</a>', div, re.S)
                 if m:
                     content = m.group(1)
-                    result["zhentidiqu"]=content
+                    result["zhentidiqu"] = content
                     repl = m.group()
                     question = question.replace(repl, content)
                 # 匹配所有图片,并下载图片,以UUID命名保存在相对路径下,图片字段多张图片使用逗号拼接
@@ -71,7 +71,6 @@ class Parser():
             else:
                 print "没有匹配到题干...", url
 
-
             dom = html.fromstring(span)
             lables = dom.xpath("//label")
             if len(lables) == 3:
@@ -91,6 +90,14 @@ class Parser():
             print "结果-->", spider.util.utf8str(result)
             ret.append(result)
         print "总共拿到", len(ret), "条数据......", url
+        if get_page:
+            #<td style="text-align:right">共计<em style="color:red"  id='pchube' value='1'>480</em>道相关试题</td>
+            m2 = re.search(ur'<td style="text-align:right">共计<em.*?>(\d+)</em>道相关试题</td>', text, re.S)
+            if m2:
+                allnum = int(m2.group(1))
+                sub = allnum % 10
+                return ret, allnum/10 if sub == 0 else allnum/10+1
+        return ret
 
 
 
@@ -131,7 +138,7 @@ class Parser():
                 time.sleep(random.randint(1, 3))
                 i += 1
                 continue
-            get_img = kwargs.get('img',False)
+            get_img = kwargs.get('img', False)
             if get_img:
                 return res.content
             return res.text
@@ -145,4 +152,4 @@ if __name__ == '__main__':
     spider.util.use_utf8()
     CurlReq.DEBUGREQ = 1
     n = Parser()
-    n.parse("http://www.jyeoo.com/math/ques/partialques?q=a246fec1-afbc-42c4-a872-0d5bfd5308fb~94e9e22a-536b-41b4-8b8e-1ed235cfac0e~I9&f=0&ct=0&dg=0&fg=0&po=0&pd=1&pi=1&r=0.8556708036907169")
+    n.parse("http://www.jyeoo.com/math/ques/partialques?q=a246fec1-afbc-42c4-a872-0d5bfd5308fb~94e9e22a-536b-41b4-8b8e-1ed235cfac0e~I9&f=0&ct=0&dg=0&fg=0&po=0&pd=1&pi=1&r=0.8556708036907169", get_page=True)
