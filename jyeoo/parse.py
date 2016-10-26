@@ -2,17 +2,12 @@
 # encoding:utf-8
 
 from spider.httpreq import SessionRequests
-from spider.spider import Spider
 import random
 import time
 import spider.util
-import json
 import uuid
-bloom = set()
-from spider.savebin import FileSaver
-import threading
+from spider.runtime import Log
 from lxml import html
-import hashlib
 import re
 from spider.httpreq import CurlReq
 
@@ -26,30 +21,26 @@ class Parser():
                              {'http': 'http://ipin:ipin1234@120.55.92.132:18888', 'https': 'https://ipin:ipin1234@120.55.92.132:18888'}
                              ]
         self.req = SessionRequests()
-        self.abs_path = "/home/windy/selfwork/jyeoo"
-        self.relative_path = "/img/"
+        self.abs_path = "./"
+        self.relative_path = "img/"
 
         self.dispatch_file = ""
 
 
-    def parse(self, text):
-        #url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=9&dg=2&fg=8&po=0&pd=1&pi=1&r=0.7957780709619277"
-        #url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=1&dg=2&fg=8&po=0&pd=1&pi=1&r=0.8630216340591749"
-        #url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=1&dg=3&fg=16&po=0&pd=1&pi=1&r=0.30025958855188817"
-        url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=2&dg=3&fg=16&po=0&pd=1&pi=1&r=0.6531368879266407"
+    def parse(self, url):
+        #url = "http://www.jyeoo.com/math/ques/partialques?q=75a08844-6562-4bf5-a182-034cf7929588~4e1c9a08-d989-45c8-b89f-097da57cbd75~&f=0&ct=2&dg=3&fg=16&po=0&pd=1&pi=1&r=0.6531368879266407"
         text = self.while_request(url, req_retry=5)
         all = re.findall(ur'<fieldset.*?>(.*?)</fieldset>(<span class="fieldtip">.*?下载</a></span>)', text, re.S)
         if len(all) == 0:
-            print "没有匹配到任何题目相关......"
+            Log.error("没有匹配到任何题目相关.%s"%url)
             #这种要做个记录，后续手动查看为什么没有匹配到，是不是正则有问题还是确实没有？！
             return
-        cnt = 0
+        ret = list()
         for div, span in all:
             # div 是题目和选项　span是查看解析/难度/真题/组卷
             #print "原始题干DIV:", div
             #print "原始查看解析/难度SPAN:", span
             result = {}
-            #div = u"""<div class="pt1"><!--B1--><span class="qseq"></span><a href="http://www.jyeoo.com/math/report/detail/915fa26b-f7e3-4cb1-8310-f905288c97c3" target="_blank">（2016春•张掖校级月考）</a>如图是一个计算程序，若输入的值为-1，则输出的结果应为<!--BA--><div class='quizPutTag' contenteditable='true'>&nbsp;</div><!--EA-->．<br /><img alt="菁优网" src="http://img.jyeoo.net/quiz/images/201512/254/ce389444.png" style="vertical-align:middle" /><br /><img alt="菁优网" src="http://img.jyeoo.net/quiz/images/201512/254/ce389445.png" style="vertical-align:middle" /><!--E1--></div><div class="pt6" style="display:none"></div>"""
             #匹配获取题目和选项
             allpt = re.findall(ur'<!--B\d+-->(.*?)<!--E\d+-->', div, re.S)
             if len(allpt) > 0:
@@ -64,8 +55,8 @@ class Parser():
                 allimg = re.findall(ur'<img.*?src="(.*?\.png)".*?>', question, re.S)
                 imgpaths = ""
                 for imgurl in allimg:
-                    imgcontent = self.while_request(imgurl, req_retry=5)
-                    fname = self.relative_path + uuid.uuid3(uuid.NAMESPACE_DNS, imgurl) + ".png" #hashlib.md5(imgurl).hexdigest() + ".png"
+                    imgcontent = self.while_request(imgurl, req_retry=5, img=True)
+                    fname = self.relative_path + uuid.uuid3(uuid.NAMESPACE_DNS, imgurl.encode("utf-8")).get_hex() + ".png" #hashlib.md5(imgurl).hexdigest() + ".png"
                     imgpaths += fname + ","
                     self.save_file(self.abs_path + fname, imgcontent)
                     question = question.replace(imgurl, fname)
@@ -97,8 +88,8 @@ class Parser():
             else:
                 print "拿不到详情页面链接...", url
             print "结果-->", spider.util.utf8str(result)
-            cnt += 1
-        print "总共拿到", cnt, "条数据......", url
+            ret.append(result)
+        print "总共拿到", len(ret), "条数据......", url
 
 
 
@@ -139,14 +130,18 @@ class Parser():
                 time.sleep(random.randint(1, 3))
                 i += 1
                 continue
+            get_img = kwargs.get('img',False)
+            if get_img:
+                return res.content
             return res.text
 
     def save_file(self, fname, content):
         with open(fname, 'wb') as f:
-            f.writelines(content)
+            f.write(content)
 
-
+import spider.util
 if __name__ == '__main__':
+    spider.util.use_utf8()
     CurlReq.DEBUGREQ = 1
     n = Parser()
-    n.parse("")
+    n.parse("http://www.jyeoo.com/math/ques/partialques?q=a246fec1-afbc-42c4-a872-0d5bfd5308fb~94e9e22a-536b-41b4-8b8e-1ed235cfac0e~I9&f=0&ct=0&dg=0&fg=0&po=0&pd=1&pi=1&r=0.8556708036907169")
