@@ -149,12 +149,12 @@ class CommonSpider(object):
                 if not job:
                     i = 0
                     while self.queue_manager.empty():
-                        # if i>5:
-                        if i > 1:
+                        if i>5:
+                        # if i > 1:
                             raise CommonSpider.GetNoneJobError()
                         time.sleep(0.5)
                         i+=1
-                        # time.sleep(2)
+                        time.sleep(2)
                 else:
                     res = self.run_job(job)
                     if res:
@@ -173,7 +173,7 @@ class CommonSpider(object):
                 self.saver.fail_save(job=job)
             except Exception as e:
                 Log.error(e.message)
-                # traceback.print_exc()
+                traceback.print_exc()
                 if self.deal_failjob(job):
                     self.queue_manager.put_retry_job(job,fail_handler=self.saver.fail_save)
             finally:

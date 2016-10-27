@@ -44,7 +44,7 @@ class DNSError(Exception):
 
 
 class CurlReq(object):
-    DEBUGREQ = 0
+    DEBUGREQ = 1
 
     class Request(object):
         def __init__(self):
