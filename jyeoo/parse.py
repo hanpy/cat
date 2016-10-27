@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding:utf-8
+import difflib
 
 from spider.httpreq import SessionRequests, BasicRequests
 import random
@@ -111,7 +112,12 @@ class Parser():
     def parse_detail(self, href, result):
         # 解析详情页面　考点　分析　解答　点评
         text = self.while_request(href, req_retry=5)
-        if result["raw_data"] not in text:
+        curr = html.fromstring(text).xpath("//div[@class='pt1']")[0].text_content().strip()
+        tigan = html.fromstring(result["raw_data"].decode('utf8')).text_content().strip()
+        radio = difflib.SequenceMatcher(None,curr,tigan).ratio()
+        if radio>0.7:
+            pass
+        if self.remove_tag(result["raw_data"]) not in self.remove_tag(text):
             time.sleep(3)
             raise RuntimeError("IP Blocked.")
 
@@ -160,6 +166,16 @@ class Parser():
     def save_file(self, fname, content):
         with open(fname, 'wb') as f:
             f.write(content)
+
+    def remove_tag(self, content):
+        m = re.compile("(<.*?>)")
+        content = re.sub(m,"",content,)
+        m = re.compile("(\(.*?\))")
+        content = re.sub(m,"",content)
+        m = re.compile("(（.*?）)")
+        content = re.sub(m,"",content)
+        return content
+
 
 import spider.util
 if __name__ == '__main__':

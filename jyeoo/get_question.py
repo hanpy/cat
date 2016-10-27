@@ -216,40 +216,44 @@ class JyeooSpider(CommonSpider):
                             data["tixing"], data["nandu"], data["tilei"] = ct_value, dg_value, fg_value
                             url+="q=%s&f=0&ct=%d&dg=%d&fg=%d&po=0&pd=%d&pi=%d&r=%s"%\
                                  (job["pk"], ct_key,dg_key,fg_key,pd,job["page"],str(random.random()))
-                            p = Parser(self.proxy_pool)
-                            pages=1
-                            if job["page"]==1:
-                                questions, pages = p.parse(url=url, get_page=True)
-                            else:
-                                questions = p.parse(url=url)
+                            # p = Parser(self.proxy_pool)
+                            # pages=1
+                            # if job["page"]==1:
+                            #     questions, pages = p.parse(url=url, get_page=True)
+                            # else:
+                            #     questions = p.parse(url=url)
                             new_job=dict()
                             new_job["type"]="getQuestionDetail"
-                            new_job["url"], new_job["ext_data"],new_job["questions"]=url,data,questions
-                            new_job["old_job"]=job
+                            new_job["url"], new_job["ext_data"],new_job["page"]=url,data,1
+                            # new_job["old_job"]=job
                             self.queue_manager.put_normal_job(new_job)
-                            for pg in range(2, pages + 1):
-                                new_job = copy.deepcopy(job)
-                                new_job["page"] = pg
-                                self.queue_manager.put_main_job(new_job)
+                            # for pg in range(2, pages + 1):
+                            #     new_job = copy.deepcopy(job)
+                            #     new_job["page"] = pg
+                            #     self.queue_manager.put_main_job(new_job)
 
         elif job["type"]=="getQuestionDetail":
             url = job["url"]
             data=job["ext_data"]
-            questions = job["questions"]
+            # questions = job["questions"]
             p = Parser(self.proxy_pool)
-            try:
-                for question in questions:
-                    href = question["href"]
-                    p.parse_detail(href, question)
-                #所有的都拿下来才保存
-                for question in questions:
-                    self.saver.save_question(question = question,ext_data = data)
-            except Exception:
-                traceback.print_exc()
-                Log.error("get question list again...")
-                old_job = job["old_job"]
-                old_job["_failcnt_"]=0
-                self.queue_manager.put_retry_job(old_job)
+            pages=1
+            if job["page"]==1:
+                questions,pages = p.parse(url,get_page=True)
+            else:
+                questions = p.parse(url)
+            for pg in range(2,pages+1):
+                new_job = copy.deepcopy(job)
+                new_job["page"]=pg
+                self.queue_manager.put_main_job(new_job)
+
+            for question in questions:
+                href = question["href"]
+                p.parse_detail(href, question)
+            #所有的都拿下来才保存
+            for question in questions:
+                self.saver.save_question(question = question,ext_data = data)
+
 import spider.util
 if __name__ == "__main__":
     spider.util.use_utf8()
