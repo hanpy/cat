@@ -39,9 +39,23 @@ class JySaver(Saver):
         Saver.__init__(self)
         # self.client = pymongo.MongoClient()
         # self.grade_table = self.client["jyeoo"]["grade"]
+        self.result_set = set()
         self.mysql_conn = pymysql.connect(**config)
         self.fail_fsaver = FileSaver("failed.txt")
+        self.init_result_set()
         self.locker = threading.RLock()
+
+    def init_result_set(self):
+        with self.mysql_conn.cursor() as cursor:
+            sql = 'SELECT url FROM question'
+            cursor.execute(sql)
+            for row in cursor:
+                self.result_set.add(row["url"])
+
+    def should_fetch(self,url):
+        if url in self.result_set:
+            return False
+        return True
 
     def fail_save(self, job, **kwargs):
         self.fail_fsaver.append(json.dumps(job))
@@ -70,6 +84,7 @@ class JySaver(Saver):
                           ' VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
                     cursor.execute(sql,self.buildSet(question,ext_data))
                 self.mysql_conn.commit()
+                self.result_set.add(question["href"])
                 print "保存成功."
             except Exception as e:
                 traceback.print_exc()
@@ -122,7 +137,7 @@ class JyeooSpider(CommonSpider):
         edition_info = job["info"]
         grade_info_list = list()
         for grade_info in edition_info["grade"]:
-            if grade_info["grade_name"]!="七年级上":
+            if grade_info["grade_name"]not in ["七年级上","七年级下","八年级上","八年级下","九年级上","九年级下"]:
                 continue
             url = "http://www.jyeoo.com/math/ques/partialcategory?a=%s" % grade_info["real_id"]
             conn = self.request_url(url)
@@ -242,13 +257,12 @@ class JyeooSpider(CommonSpider):
             for pg in range(2,pages+1):
                 new_job = copy.deepcopy(job)
                 new_job["page"]=pg
-                self.queue_manager.put_main_job(new_job)
+                self.queue_manager.put_normal_job(new_job)
 
             for question in questions:
                 href = question["href"]
-                if href not in self.result_set:
+                if self.saver.should_fetch(href):
                     p.parse_detail(href, question,job=job)
-                    self.result_set.add(href)
                     self.saver.save_question(question,ext_data=data)
                 else:
                     Log.info("skip:%s"%href)
