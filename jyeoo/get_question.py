@@ -57,7 +57,7 @@ class JySaver(Saver):
         s = (ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
                 ext_data["nandu"],ext_data["tilei"],question["tigan"],question["xuanxiang"],
                 question["tupian"], question["nandu"],question["zhenti"],question["zujuan"],
-                question["kaodian"],question["fenxi"],question["jieda"],question["dianping"],question["zhentidiqu"],question["url"])
+                question["kaodian"],question["fenxi"],question["jieda"],question["dianping"],question["zhentidiqu"],question["href"])
         return s
 
     def save_question(self,question, ext_data):
