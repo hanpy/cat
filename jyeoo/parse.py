@@ -93,7 +93,7 @@ class Parser():
             if len(tagA) > 0:
                 href = tagA[0].attrib.get("href", '')
                 # TODO
-                self.parse_detail(href, result)
+                # self.parse_detail(href, result)
                 result["href"] = href
             else:
                 job["err_msg"] = "拿不到详情页面链接.span=#%s" % span

@@ -4,6 +4,7 @@ import copy
 import json
 import random
 import re
+import threading
 import traceback
 from jyeoo.parse import Parser
 import pymongo
@@ -11,7 +12,7 @@ import pymysql
 
 from spider.CommonSpider import CommonSpider, Dispatcher, Saver
 from spider.ProxyPool import EmptyProxyPool, FileProxyPool, ADSLProxyPool
-from spider.MQManager import RawQManager
+from spider.MQManager import RawQManager, RedisMqManager
 from spider.httpreq import BasicRequests, SessionRequests
 from lxml import etree
 
@@ -40,6 +41,7 @@ class JySaver(Saver):
         # self.grade_table = self.client["jyeoo"]["grade"]
         self.mysql_conn = pymysql.connect(**config)
         self.fail_fsaver = FileSaver("failed.txt")
+        self.locker = threading.RLock()
 
     def fail_save(self, job, **kwargs):
         self.fail_fsaver.append(json.dumps(job))
@@ -55,22 +57,23 @@ class JySaver(Saver):
         s = (ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
                 ext_data["nandu"],ext_data["tilei"],question["tigan"],question["xuanxiang"],
                 question["tupian"], question["nandu"],question["zhenti"],question["zujuan"],
-                question["kaodian"],question["fenxi"],question["jieda"],question["dianping"],question["zhentidiqu"])
+                question["kaodian"],question["fenxi"],question["jieda"],question["dianping"],question["zhentidiqu"],question["url"])
         return s
 
     def save_question(self,question, ext_data):
-        print "正在保存..."
-        try:
-            with self.mysql_conn.cursor() as cursor:
-                sql = 'INSERT INTO question (banben, nianjixueqi,zhangjie,tixing,nandu,tilei,tigan,' \
-                      'xuanxiang,tupian,nanduxishu,zhenti,zujuan,kaodian,fenxi,jieda,dianping,zhentidiqu)' \
-                      ' VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-                cursor.execute(sql,self.buildSet(question,ext_data))
-            self.mysql_conn.commit()
-            print "保存成功."
-        except Exception as e:
-            traceback.print_exc()
-            raise RuntimeError("存库出错。"+e.message)
+        with self.locker:
+            print "正在保存..."
+            try:
+                with self.mysql_conn.cursor() as cursor:
+                    sql = 'INSERT INTO question (banben, nianjixueqi,zhangjie,tixing,nandu,tilei,tigan,' \
+                          'xuanxiang,tupian,nanduxishu,zhenti,zujuan,kaodian,fenxi,jieda,dianping,zhentidiqu,url)' \
+                          ' VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+                    cursor.execute(sql,self.buildSet(question,ext_data))
+                self.mysql_conn.commit()
+                print "保存成功."
+            except Exception as e:
+                traceback.print_exc()
+                raise RuntimeError("存库出错。"+e.message)
 
     def close(self):
         # self.client.close()
@@ -80,7 +83,9 @@ class JySaver(Saver):
 class JyeooSpider(CommonSpider):
     def __init__(self, worker_count):
         CommonSpider.__init__(self, spider_name="Jyeoo", worker_count=worker_count);
-        self.queue_manager = RawQManager()
+        # self.queue_manager = RawQManager()
+        self.queue_manager = RedisMqManager(spider_name="jyeoo")
+        self.result_set=set()
         # self.proxy_pool = FileProxyPool('static_proxy')
         self.proxy_pool = ADSLProxyPool()
         self.dispatcher = JyDispatcher(self.queue_manager)
@@ -218,21 +223,11 @@ class JyeooSpider(CommonSpider):
                             data["tixing"], data["nandu"], data["tilei"] = ct_value, dg_value, fg_value
                             url+="q=%s&f=0&ct=%d&dg=%d&fg=%d&po=0&pd=%d&pi=%d&r=%s"%\
                                  (job["pk"], ct_key,dg_key,fg_key,pd,job["page"],str(random.random()))
-                            # p = Parser(self.proxy_pool)
-                            # pages=1
-                            # if job["page"]==1:
-                            #     questions, pages = p.parse(url=url, get_page=True)
-                            # else:
-                            #     questions = p.parse(url=url)
+
                             new_job=dict()
                             new_job["type"]="getQuestionDetail"
-                            new_job["url"], new_job["ext_data"],new_job["page"]=url,data,1
-                            # new_job["old_job"]=job
+                            new_job["url"], new_job["ext_data"],new_job["page"]=url,copy.deepcopy(data),1
                             self.queue_manager.put_normal_job(new_job)
-                            # for pg in range(2, pages + 1):
-                            #     new_job = copy.deepcopy(job)
-                            #     new_job["page"] = pg
-                            #     self.queue_manager.put_main_job(new_job)
 
         elif job["type"]=="getQuestionDetail":
             url = job["url"]
@@ -251,13 +246,19 @@ class JyeooSpider(CommonSpider):
 
             for question in questions:
                 href = question["href"]
-                p.parse_detail(href, question,job=job)
-            #所有的都拿下来才保存
-            for question in questions:
-                self.saver.save_question(question = question,ext_data = data)
+                if href not in self.result_set:
+                    p.parse_detail(href, question,job=job)
+                    self.result_set.add(href)
+                    self.saver.save_question(question,ext_data=data)
+                else:
+                    Log.info("skip:%s"%href)
+
+            # 所有的都拿下来才保存
+            # for question in questions:
+            #     self.saver.save_question(question = question,ext_data = data)
 
 import spider.util
 if __name__ == "__main__":
     spider.util.use_utf8()
-    s = JyeooSpider(1)
+    s = JyeooSpider(2)
     s.run()
