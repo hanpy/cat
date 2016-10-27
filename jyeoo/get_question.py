@@ -16,6 +16,7 @@ from spider.httpreq import BasicRequests, SessionRequests
 from lxml import etree
 
 from spider.runtime import Log
+from spider.savebin import FileSaver
 
 
 class JyDispatcher(Dispatcher):
@@ -38,9 +39,10 @@ class JySaver(Saver):
         # self.client = pymongo.MongoClient()
         # self.grade_table = self.client["jyeoo"]["grade"]
         self.mysql_conn = pymysql.connect(**config)
+        self.fail_fsaver = FileSaver("failed.txt")
 
     def fail_save(self, job, **kwargs):
-        pass
+        self.fail_fsaver.append(json.dumps(job))
 
     def succ_save(self, res, **kwargs):
         print json.dumps(res)
@@ -239,9 +241,9 @@ class JyeooSpider(CommonSpider):
             p = Parser(self.proxy_pool)
             pages=1
             if job["page"]==1:
-                questions,pages = p.parse(url,get_page=True)
+                questions,pages = p.parse(url,job=job,get_page=True)
             else:
-                questions = p.parse(url)
+                questions = p.parse(url,job=job)
             for pg in range(2,pages+1):
                 new_job = copy.deepcopy(job)
                 new_job["page"]=pg
@@ -249,7 +251,7 @@ class JyeooSpider(CommonSpider):
 
             for question in questions:
                 href = question["href"]
-                p.parse_detail(href, question)
+                p.parse_detail(href, question,job=job)
             #所有的都拿下来才保存
             for question in questions:
                 self.saver.save_question(question = question,ext_data = data)
