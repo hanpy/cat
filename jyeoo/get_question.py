@@ -96,8 +96,8 @@ class JySaver(Saver):
 
 
 class JyeooSpider(CommonSpider):
-    def __init__(self, worker_count):
-        CommonSpider.__init__(self, spider_name="Jyeoo", worker_count=worker_count);
+    def __init__(self, worker_count,rerun):
+        CommonSpider.__init__(self, spider_name="Jyeoo", worker_count=worker_count,rerun=rerun);
         # self.queue_manager = RawQManager()
         self.queue_manager = RedisMqManager(spider_name="jyeoo")
         self.result_set=set()
@@ -272,7 +272,13 @@ class JyeooSpider(CommonSpider):
             #     self.saver.save_question(question = question,ext_data = data)
 
 import spider.util
+from optparse import OptionParser
 if __name__ == "__main__":
     spider.util.use_utf8()
-    s = JyeooSpider(2)
+    parser = OptionParser()
+    parser.add_option("-r", "--rerun",
+                      action="store_true", dest="is_rerun", default=False,
+                      help="rerun flag")
+    (options, args) = parser.parse_args()
+    s = JyeooSpider(20,rerun=options.is_rerun)
     s.run()

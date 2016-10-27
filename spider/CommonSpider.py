@@ -47,7 +47,7 @@ class CommonSpider(object):
     class FatalError(Exception):pass
     # class Saver(Saver): pass
     # class Dispatcher(Dispatcher): pass
-    def __init__(self, spider_name, worker_count=10, listen_port=28888):
+    def __init__(self, spider_name, worker_count=10, listen_port=28888,rerun=False):
         self.queue_manager = CommonQueueManager()
         self.proxy_pool = ProxyPool()
         self.saver = Saver()
@@ -63,6 +63,7 @@ class CommonSpider(object):
         self.pause_flag = False
         self._tls = threading.local()
         self.job_cache=dict()
+        self.rerun_flag = rerun
 
     def reg_sign_handler(self):
         signal.signal(signal.SIGINT, self.sigint_handler)
@@ -91,7 +92,8 @@ class CommonSpider(object):
         self.listener.start()
         self.reporter = threading.Thread(target=self.report)
         self.reporter.start()
-        self.dispatcher.start()
+        if not self.rerun_flag:
+            self.dispatcher.start()
         self.proxy_pool.run()
         self.reg_sign_handler()
 
