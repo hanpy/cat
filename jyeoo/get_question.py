@@ -104,16 +104,18 @@ class JySaver(Saver):
                 if not row:
                     return True
                 else:
-                    if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
-                                    ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
-                                    ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
-                        return True
-                    else:
-                        ext_data["url"] = href
-                        sql = "INSERT INTO question (banben, nianjixueqi, zhangjie, tixing, nandu, tilei, url) values" \
-                              "(%s,%s,%s,%s,%s,%s,%s)"
-                        cursor.execute(sql, [ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
-                                                 ext_data["nandu"],ext_data["tilei"],ext_data["url"]])
+                    while row:
+                        if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
+                                        ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
+                                        ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
+                            return True
+                        row = cursor.fetchone()
+        
+                    ext_data["url"] = href
+                    sql = "INSERT INTO question (banben, nianjixueqi, zhangjie, tixing, nandu, tilei, url) values" \
+                          "(%s,%s,%s,%s,%s,%s,%s)"
+                    cursor.execute(sql, [ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
+                                             ext_data["nandu"],ext_data["tilei"],ext_data["url"]])
             self.mysql_conn.commit()
             return False
 
