@@ -92,8 +92,9 @@ class Parser():
             tagA = dom.xpath("//a[@target='_blank']")
             if len(tagA) > 0:
                 href = tagA[0].attrib.get("href", '')
+                print "链接：", href
                 # TODO
-                # self.parse_detail(href, result)
+                self.parse_detail(href, result)
                 result["href"] = href
             else:
                 job["err_msg"] = "拿不到详情页面链接.span=#%s" % span
@@ -126,9 +127,6 @@ class Parser():
     def parse_detail(self, href, result, job={}):
         # 解析详情页面　考点　分析　解答　点评
         text = self.while_request(href, req_retry=5)
-        if 'class="mustvip"' in text:
-            job["err_msg"] = "详情页需要vip账号才能查看#%s" % (href)
-            raise CommonSpider.BadJobError()
         detail_dom = html.fromstring(text)
 
         curr = detail_dom.xpath("//div[@class='pt1']")[0].text_content().strip()
@@ -186,7 +184,7 @@ class Parser():
         i = 0
         while i < retry:
             #num = random.randint(0, len(self.proxies_dict) - 1)
-            kwargs["proxies"] = self.proxy_pool.get_one()
+            kwargs["proxies"] = {'http': 'http://ipin:ipin1234@120.55.97.254:18888', 'https': 'https://ipin:ipin1234@120.55.97.254:18888'}#self.proxy_pool.get_one()
             kwargs["timeout"] = 6
             kwargs["proxy_credit"]=1
             res = self.req.request_url(url, **kwargs)
@@ -219,11 +217,11 @@ import spider.util
 if __name__ == '__main__':
     spider.util.use_utf8()
     CurlReq.DEBUGREQ = 1
-    proxy_pool = ADSLProxyPool()
-    proxy_pool.run()
-    n = Parser(proxy_pool=proxy_pool)
+    #proxy_pool = ADSLProxyPool()
+    #proxy_pool.run()
+    n = Parser(proxy_pool=None)
     n.parse("http://www.jyeoo.com/math/ques/partialques?q=a246fec1-afbc-42c4-a872-0d5bfd5308fb~94e9e22a-536b-41b4-8b8e-1ed235cfac0e~I9&f=0&ct=0&dg=0&fg=0&po=0&pd=1&pi=1&r=0.8556708036907169", get_page=True)
-    proxy_pool.close()
+    #proxy_pool.close()
     #r=dict()
     #n.parse_detail(href="http://www.jyeoo.com/math/ques/detail/105a9b16-1151-415c-52b8-94e25863ae49",result=r)
     #print r
