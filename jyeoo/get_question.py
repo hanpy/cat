@@ -112,40 +112,16 @@ class JySaver(Saver):
         #--------- mongo ------------------------
         print "正在保存"
         try:
-            question.update(ext_data)
-            question["url"] = question.pop("href")
-            self.table.insert(question)
+            doc = copy.deepcopy(question)
+            doc.update(ext_data)
+            doc["url"] = doc.pop("href")
+            self.table.insert_one(doc)
             print "保存成功."
         except Exception as e:
             traceback.print_exc()
             raise RuntimeError("存库出错。" + e.message)
 
     def complete(self, href, ext_data):
-        #-----------mydql--------------------
-        # with self.locker:
-        #     with self.mysql_conn.cursor() as cursor:
-        #         sql = "SELECT banben, nianjixueqi, zhangjie, tixing, nandu, tilei FROM question" \
-        #               " WHERE url= %s"%self.mysql_conn.escape(href)
-        #         cursor.execute(sql)
-        #         row = cursor.fetchone()
-        #         if not row:
-        #             return True
-        #         else:
-        #             while row:
-        #                 if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
-        #                                 ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
-        #                                 ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
-        #                     return True
-        #                 row = cursor.fetchone()
-        #
-        #             ext_data["url"] = href
-        #             sql = "INSERT INTO question (banben, nianjixueqi, zhangjie, tixing, nandu, tilei, url) values" \
-        #                   "(%s,%s,%s,%s,%s,%s,%s)"
-        #             cursor.execute(sql, [ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
-        #                                      ext_data["nandu"],ext_data["tilei"],ext_data["url"]])
-        #     self.mysql_conn.commit()
-        #     return False
-        #----------------- mongo ----------------
         cursor = self.table.find({"url":href})
         try:
             while True:
@@ -155,9 +131,10 @@ class JySaver(Saver):
                         ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
                                 return True
         except StopIteration:
-            print "init cache completed."
-        ext_data["url"] = href
-        self.table.insert_one(ext_data)
+            pass
+        doc = copy.deepcopy(ext_data)
+        doc["url"] = href
+        self.table.insert_one(doc)
 
     def close(self):
         self.client.close()
