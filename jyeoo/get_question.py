@@ -40,20 +40,34 @@ config = {
 class JySaver(Saver):
     def __init__(self):
         Saver.__init__(self)
-        # self.client = pymongo.MongoClient()
+        self.client = pymongo.MongoClient()
+        self.table = self.client["jyeoo"]["question"]
         # self.grade_table = self.client["jyeoo"]["grade"]
         self.result_set = set()
-        self.mysql_conn = pymysql.connect(**config)
+        # self.mysql_conn = pymysql.connect(**config)
         self.fail_fsaver = FileSaver("failed.txt")
         self.init_result_set()
         self.locker = threading.RLock()
 
     def init_result_set(self):
-        with self.mysql_conn.cursor() as cursor:
-            sql = 'SELECT url FROM question'
-            cursor.execute(sql)
-            for row in cursor:
-                self.result_set.add(row["url"])
+        #------- mysql ----------------------------
+        # with self.mysql_conn.cursor() as cursor:
+        #     sql = 'SELECT url FROM question'
+        #     cursor.execute(sql)
+        #     for row in cursor:
+        #         self.result_set.add(row["url"])
+        #------- mongo ----------------------------
+        cursor = self.table.find()
+        cnt = 0
+        try:
+            while True:
+                doc = cursor.next()
+                self.result_set.add(doc["url"])
+                cnt += 1
+                if cnt % 100 == 0:
+                    print "add %d docs to cache." % cnt
+        except StopIteration:
+            print "init cache completed."
 
     def should_fetch(self, url):
         if url in self.result_set:
@@ -68,7 +82,8 @@ class JySaver(Saver):
         pass
 
     def save_grade_info(self, doc):
-        self.grade_table.insert_one(doc)
+        # self.grade_table.insert_one(doc)
+        pass
 
     def buildSet(self, question, ext_data):
         s = (ext_data["banben"], ext_data["nianjixueqi"], ext_data["zhangjie"], ext_data["tixing"],
@@ -79,51 +94,74 @@ class JySaver(Saver):
         return s
 
     def save_question(self, question, ext_data):
-        with self.locker:
-            print "正在保存..."
-            try:
-                with self.mysql_conn.cursor() as cursor:
-                    sql = 'INSERT INTO question (banben, nianjixueqi,zhangjie,tixing,nandu,tilei,tigan,' \
-                          'xuanxiang,tupian,nanduxishu,zhenti,zujuan,kaodian,fenxi,jieda,dianping,zhentidiqu,url)' \
-                          ' VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-                    cursor.execute(sql, self.buildSet(question, ext_data))
-                self.mysql_conn.commit()
-                self.result_set.add(question["href"])
-                print "保存成功."
-            except Exception as e:
-                traceback.print_exc()
-                raise RuntimeError("存库出错。" + e.message)
+        #---------- mysql -----------------------
+        # with self.locker:
+        #     print "正在保存..."
+        #     try:
+        #         with self.mysql_conn.cursor() as cursor:
+        #             sql = 'INSERT INTO question (banben, nianjixueqi,zhangjie,tixing,nandu,tilei,tigan,' \
+        #                   'xuanxiang,tupian,nanduxishu,zhenti,zujuan,kaodian,fenxi,jieda,dianping,zhentidiqu,url)' \
+        #                   ' VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        #             cursor.execute(sql, self.buildSet(question, ext_data))
+        #         self.mysql_conn.commit()
+        #         self.result_set.add(question["href"])
+        #         print "保存成功."
+        #     except Exception as e:
+        #         traceback.print_exc()
+        #         raise RuntimeError("存库出错。" + e.message)
+        #--------- mongo ------------------------
+        print "正在保存"
+        try:
+            question.update(ext_data)
+            question["url"] = question.pop("href")
+            self.table.insert(question)
+            print "保存成功."
+        except Exception as e:
+            traceback.print_exc()
+            raise RuntimeError("存库出错。" + e.message)
 
     def complete(self, href, ext_data):
-        with self.locker:
-            with self.mysql_conn.cursor() as cursor:
-                sql = "SELECT banben, nianjixueqi, zhangjie, tixing, nandu, tilei FROM question" \
-                      " WHERE url= %s"%self.mysql_conn.escape(href)
-                cursor.execute(sql)
-                row = cursor.fetchone()
-                if not row:
-                    return True
-                else:
-                    while row:
-                        if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
-                                        ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
-                                        ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
-                            return True
-                        row = cursor.fetchone()
-        
-                    ext_data["url"] = href
-                    sql = "INSERT INTO question (banben, nianjixueqi, zhangjie, tixing, nandu, tilei, url) values" \
-                          "(%s,%s,%s,%s,%s,%s,%s)"
-                    cursor.execute(sql, [ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
-                                             ext_data["nandu"],ext_data["tilei"],ext_data["url"]])
-            self.mysql_conn.commit()
-            return False
-
-
+        #-----------mydql--------------------
+        # with self.locker:
+        #     with self.mysql_conn.cursor() as cursor:
+        #         sql = "SELECT banben, nianjixueqi, zhangjie, tixing, nandu, tilei FROM question" \
+        #               " WHERE url= %s"%self.mysql_conn.escape(href)
+        #         cursor.execute(sql)
+        #         row = cursor.fetchone()
+        #         if not row:
+        #             return True
+        #         else:
+        #             while row:
+        #                 if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
+        #                                 ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
+        #                                 ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
+        #                     return True
+        #                 row = cursor.fetchone()
+        #
+        #             ext_data["url"] = href
+        #             sql = "INSERT INTO question (banben, nianjixueqi, zhangjie, tixing, nandu, tilei, url) values" \
+        #                   "(%s,%s,%s,%s,%s,%s,%s)"
+        #             cursor.execute(sql, [ext_data["banben"],ext_data["nianjixueqi"],ext_data["zhangjie"],ext_data["tixing"],
+        #                                      ext_data["nandu"],ext_data["tilei"],ext_data["url"]])
+        #     self.mysql_conn.commit()
+        #     return False
+        #----------------- mongo ----------------
+        cursor = self.table.find({"url":href})
+        try:
+            while True:
+                row = cursor.next()
+                if ext_data["banben"] == row["banben"] and ext_data["nianjixueqi"] == row["nianjixueqi"] and \
+                    ext_data["zhangjie"] == row["zhangjie"] and ext_data["tixing"] == row["tixing"] and \
+                        ext_data["nandu"] == row["nandu"] and ext_data["tilei"] == row["tilei"]:
+                                return True
+        except StopIteration:
+            print "init cache completed."
+        ext_data["url"] = href
+        self.table.insert_one(ext_data)
 
     def close(self):
-        # self.client.close()
-        self.mysql_conn.close()
+        self.client.close()
+        # self.mysql_conn.close()
 
 
 class JyeooSpider(CommonSpider):
