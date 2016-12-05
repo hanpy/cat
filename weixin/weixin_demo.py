@@ -63,8 +63,8 @@ class SogouWeixinDemo():
                     print "搜索结果为空"
                     succ = True
                     continue
-                accs = re.findall('div target="_blank" href="(.*?)".*?<label name="em_weixinhao">(.*?)</label>', content,
-                                  re.S)
+                accs = re.findall('uigs="main_toweixin_account_name_\d+"\s*href="(.*?)".*?<label name="em_weixinhao">(.*?)</label>',
+                                  content, re.S)
                 # if len(accs)==0:
                 #     raise RuntimeError("extract %s's main page url failed."%key)
                 if len(accs) == 0:
@@ -96,12 +96,14 @@ class SogouWeixinDemo():
         if "为了保护你的网络安全，请输入验证码" in content:
             Log.error("Require Verification.")
             return False
-        m = re.search(r"var msgList = '(.*?)';", content, re.S)
+        m = re.search("var msgList\s*=\s*(\{.*?\});" ,content, re.S)
         if not m:
             Log.error("get %s's article list failed." % key)
             return False
         msg_list_string = m.group(1)
-        msg_list = json.loads(msg_list_string.replace("&quot;", '"').replace("\\", "").replace("&amp;amp;", "&"))[
+        #msg_list = json.loads(msg_list_string.replace("&quot;", '"').replace("\\", "").replace("&amp;amp;", "&"))[
+        # "list"]
+        msg_list = json.loads(msg_list_string.replace("\\", "").replace("&amp;amp;", "&"))[
             "list"]
         data = dict()
         data["msg_list"] = list()
@@ -144,7 +146,7 @@ class SogouWeixinDemo():
             print "*******************************************************************************"
             print " [%s／%s]（昵称/微信号)  <<%s>> 发布于%s" % (msg["name"], msg["account"], msg["title"], date)
             print ""
-            content_url = msg["content_url"]
+            content_url = msg["content_url"].replace("&quot;", '"').replace("\\", "").replace("&amp;", "&")
             url = "http://mp.weixin.qq.com" + content_url
             conn = sreq.request_url(url=url, headers=headers)
             if not conn or conn.code != 200:
