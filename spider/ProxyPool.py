@@ -56,13 +56,13 @@ class ADSLProxyPool(ProxyPool, BasicRequests):
         with self.plock:
             while len(self.proxy_list) > 0: self.proxy_list.pop()
             self.proxy_dict.clear()
-            for item in j["result"].items():
-                key, detail = item[0], item[1]
-                # proxy={"http://%s:%s/%s"%(self.user,self.password,detail),
-                #        "https://%s:%s/%s"%(self.user,self.password,value)}
+            for key, detail in j["result"].items():
                 if key not in self.invalid_key:
+                    timeArray = time.strptime(detail["update"], "%Y-%m-%d %H:%M:%S")
+                    timeStamp = int(time.mktime(timeArray))
+                    if time.time()-timeStamp > detail["interval"]-10: continue
                     self.proxy_dict[key] = detail
-                    self.proxy_list.append(item)
+                    self.proxy_list.append((key, detail))
 
     def default_getter(self):
         with self.plock:
@@ -93,7 +93,10 @@ class ADSLProxyPool(ProxyPool, BasicRequests):
             return {"http": "http://ipin:helloipin@" + info["ip"], "https": "https://ipin:helloipin@" + info["ip"]}
 
     def get_all(self):
-        return self.proxy_dict
+        result = dict()
+        for name, info in self.proxy_dict.items():
+            result["ipin:helloipin@"+info["ip"]] = 0
+        return result
 
     def remove_by_key(self, key):
         self.invalid_key.append(key)
@@ -185,26 +188,8 @@ class EmptyProxyPool(ProxyPool):
 
 
 if __name__ == "__main__":
-
-    def t_run(id, p):
-        while True:
-            Log.info(str(id) + " " + p.get_one(getter="bind").__str__())
-            time.sleep(1)
-
-
-    p = FileProxyPool("ipinproxy.txt")
-    p.run()
-
-    threads = []
-    time.sleep(3)
-
-    for i in range(3):
-        t = threading.Thread(target=t_run, args=(i, p,))
-        t.start()
-        threads.append(t)
-    time.sleep(5)
-    p.remove_by_key(0)
-    time.sleep(10)
-    p.reset_filter()
-    for t in threads:
-        t.join()
+    pl = ADSLProxyPool()
+    pl.run()
+    while True:
+        time.sleep(1)
+        print pl.get_one()

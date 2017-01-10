@@ -46,6 +46,7 @@ class JySaver(Saver):
         self.result_set = set()
         # self.mysql_conn = pymysql.connect(**config)
         self.fail_fsaver = FileSaver("failed.txt")
+        self.question_list_saver = FileSaver("question_list.txt")
         self.init_result_set()
         self.locker = threading.RLock()
 
@@ -120,6 +121,11 @@ class JySaver(Saver):
         except Exception as e:
             traceback.print_exc()
             raise RuntimeError("存库出错。" + e.message)
+
+    def save_question_list(self, questions, ext_data):
+        for question in questions:
+            question["ext_data"] = ext_data
+            self.question_list_saver.append(json.dumps(question))
 
     def complete(self, href, ext_data):
         cursor = self.table.find({"url":href})
@@ -272,7 +278,7 @@ class JyeooSpider(CommonSpider):
             data = dict()
             data["banben"], data["nianjixueqi"], data["zhangjie"] = \
                 job["edition_name"], job["grade_name"], job["point_name"]
-            config = {"pd": [0, 1],  # 1是真题，0不是
+            config = {"pd": [1, 0],  # 1是真题，0不是
                       "ct": {1: "选择题", 2: "填空题", 9: "解答题"},
                       "dg": {1: "基础题", 2: "中档题", 3: "难题"},
                       "fg": {1: "中考题", 2: "好题", 4: "易错题", 8: "常考题", 16: "压轴题"}
@@ -305,17 +311,18 @@ class JyeooSpider(CommonSpider):
                 new_job = copy.deepcopy(job)
                 new_job["page"] = pg
                 self.queue_manager.put_normal_job(new_job)
+            self.saver.save_question_list(questions, data)
 
-            for question in questions:
-                href = question["href"]
-                if self.saver.should_fetch(href):
-                    p.parse_detail(href, question, job=job)
-                    self.saver.save_question(question, ext_data=data)
-                else:
-                    if self.saver.complete(href=href,ext_data=data):
-                        Log.info("skip:%s" % href)
-                    else:
-                        Log.info("补全%s"%href)
+            # for question in questions:
+            #     href = question["href"]
+            #     if self.saver.should_fetch(href):
+            #         p.parse_detail(href, question, job=job)
+            #         self.saver.save_question(question, ext_data=data)
+            #     else:
+            #         if self.saver.complete(href=href,ext_data=data):
+            #             Log.info("skip:%s" % href)
+            #         else:
+            #             Log.info("补全%s"%href)
 
                     # 所有的都拿下来才保存
                     # for question in questions:
