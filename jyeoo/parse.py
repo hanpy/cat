@@ -31,7 +31,7 @@ g_user_agent = ["=Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, 
                 "=Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/5.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; InfoPath.3; .NET4.0C; .NET4.0E) QQBrowser/6.9.11079.201"]
 
 class Parser():
-    def __init__(self, proxy_pool=None):
+    def __init__(self, proxy_pool=None, sreq=None):
         self.proxies_dict = [
                              {'http': 'http://ipin:ipin1234@120.55.97.254:18888', 'https': 'https://ipin:ipin1234@120.55.97.254:18888'},
                              {'http': 'http://ipin:ipin1234@120.26.111.91:18888', 'https': 'https://ipin:ipin1234@120.26.111.91:18888'},
@@ -39,8 +39,8 @@ class Parser():
                              {'http': 'http://ipin:ipin1234@120.26.134.183:18888', 'https': 'https://ipin:ipin1234@120.26.134.183:18888'},
                              {'http': 'http://ipin:ipin1234@120.55.92.132:18888', 'https': 'https://ipin:ipin1234@120.55.92.132:18888'}
                              ]
-        self.req = SessionRequests()
-        self.proxy_pool = proxy_pool
+        self.req = sreq or SessionRequests()
+	self.proxy_pool = proxy_pool
         self.abs_path = "./"
         self.relative_path = "img/"
 
@@ -52,12 +52,16 @@ class Parser():
         text = self.while_request(url, req_retry=5)
         all = re.findall(ur'<fieldset.*?>(.*?)</fieldset>(<span class="fieldtip">.*?下载</a></span>)', text, re.S)
         ret = list()
+        if re.search(ur'访问太快', text, re.S):
+            Log.error("访问太快")
+            raise RuntimeError("访问太快")
         if len(all) == 0:
             Log.error("没有匹配到任何题目相关.%s"%url)
+            raise CommonSpider.BadJobError("没有匹配到任何题目相关.%s"%url)
             #这种要做个记录，后续手动查看为什么没有匹配到，是不是正则有问题还是确实没有？！
-            if get_page:
-                return ret, 0
-            return ret
+            #if get_page:
+            #    return ret, 0
+            #return ret
         for div, span in all:
             # div 是题目和选项　span是查看解析/难度/真题/组卷
             #print "原始题干DIV:", div
@@ -113,17 +117,25 @@ class Parser():
             else:
                 job["err_msg"] = "拿不到详情页面链接.span=#%s" % span
                 raise CommonSpider.BadJobError()
-            print "结果-->", spider.util.utf8str(result)
+            #print "结果-->", spider.util.utf8str(result)
             ret.append(result)
         print "总共拿到", len(ret), "条数据......", url
+        m = re.search(r'"index cur">\s*(\d+)\s*<', text, re.S)
+        if m:
+            curr_page = int(m.group(1))
+        elif len(ret) >0:
+            curr_page = 1
+        else:
+            print text
+            raise RuntimeError("需要登录")
         if get_page:
             #<td style="text-align:right">共计<em style="color:red"  id='pchube' value='1'>480</em>道相关试题</td>
             m2 = re.search(ur'<td style="text-align:right">共计<em.*?>(\d+)</em>道相关试题</td>', text, re.S)
             if m2:
                 allnum = int(m2.group(1))
                 sub = allnum % 10
-                return ret, allnum/10 if sub == 0 else allnum/10+1
-        return ret
+                return ret, allnum/10 if sub == 0 else allnum/10+1, curr_page
+        return ret, curr_page
 
 
     def img_process(self, imgtext, imgpaths):

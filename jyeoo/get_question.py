@@ -9,7 +9,7 @@ import traceback
 from jyeoo.parse import Parser
 import pymongo
 import pymysql
-
+from jyeoo.login import JyeooLogin
 from spider.CommonSpider import CommonSpider, Dispatcher, Saver
 from spider.ProxyPool import EmptyProxyPool, FileProxyPool, ADSLProxyPool
 from spider.MQManager import RawQManager, RedisMqManager
@@ -22,8 +22,26 @@ from spider.savebin import FileSaver
 
 class JyDispatcher(Dispatcher):
     def run(self):
-        self.queue_manager.put_main_job(
-            {"type": "getEdition", "subject": "math", "url": "http://www.jyeoo.com/math/ques/search"})
+        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中政治", "url": "http://www.jyeoo.com/politics/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中数学", "url": "http://www.jyeoo.com/math/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中物理", "url": "http://www.jyeoo.com/physics/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中化学", "url": "http://www.jyeoo.com/chemistry/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中生物", "url": "http://www.jyeoo.com/bio/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中地理", "url": "http://www.jyeoo.com/geography/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中英语", "url": "http://www.jyeoo.com/english/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中语文", "url": "http://www.jyeoo.com/chinese/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中历史", "url": "http://www.jyeoo.com/history/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "初中科学", "url": "http://www2.jyeoo.com/science/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中数学", "url": "http://www.jyeoo.com/math2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中物理", "url": "http://www.jyeoo.com/physics2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中化学", "url": "http://www.jyeoo.com/chemistry2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中生物", "url": "http://www.jyeoo.com/bio2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中地理", "url": "http://www.jyeoo.com/geography2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中英语", "url": "http://www.jyeoo.com/english2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中语文", "url": "http://www.jyeoo.com/chinese2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中政治", "url": "http://www.jyeoo.com/politics2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "高中历史", "url": "http://www.jyeoo.com/history2/ques/search"})
+#        self.queue_manager.put_main_job({"type": "getEdition", "subject": "小学数学", "url": "http://www.jyeoo.com/math3/ques/search"})
 
 
 config = {
@@ -42,6 +60,8 @@ class JySaver(Saver):
         Saver.__init__(self)
         self.client = pymongo.MongoClient()
         self.table = self.client["jyeoo"]["question"]
+        self.chapter_table = self.client["jyeoo"]["chapter"]
+        self.point_table = self.client["jyeoo"]["point"]
         # self.grade_table = self.client["jyeoo"]["grade"]
         self.result_set = set()
         # self.mysql_conn = pymysql.connect(**config)
@@ -49,6 +69,22 @@ class JySaver(Saver):
         self.question_list_saver = FileSaver("question_list.txt")
         self.init_result_set()
         self.locker = threading.RLock()
+
+    def save_chapter(self, chapter):
+        if isinstance(chapter, list):
+            for item in chapter:
+                self.chapter_table.insert_one(item)
+        else:
+            self.chapter_table.insert_one(chapter)
+        print "save chapter-info success."
+
+    def save_point(self, point):
+        if isinstance(point, list):
+            for item in point:
+                self.point_table.insert_one(item)
+        else:
+            self.point_table.insert_one(point)
+        print "save point-info success."
 
     def init_result_set(self):
         #------- mysql ----------------------------
@@ -58,6 +94,7 @@ class JySaver(Saver):
         #     for row in cursor:
         #         self.result_set.add(row["url"])
         #------- mongo ----------------------------
+        return
         cursor = self.table.find()
         cnt = 0
         try:
@@ -170,6 +207,9 @@ class JyeooSpider(CommonSpider):
             raise RuntimeError("版本信息访问出错")
         content = conn.text.encode("utf-8")
         m = re.search('<tr class="JYE_EDITION">(.*?)</tr>', content, re.S)
+        if not m:
+            Log.error("%s:没有版本信息, 考虑只有考点信息"%job["subject"])
+            return []
         edition_info_list = list()
         for id, edition in re.findall('<a.*?data-id="(.*?)".*?>\s*(.*?)\s*</a>', m.group(1), re.S):
             edition_info = dict()
@@ -185,13 +225,58 @@ class JyeooSpider(CommonSpider):
             edition_info_list.append(edition_info)
         return edition_info_list
 
+    def get_points(self, job):
+        base_url = job["base_url"][:job["base_url"].rfind("/")]
+        url = base_url+"/partialcategory?a=undefined&q=&f=1"
+        conn = self.request_url(url)
+        if not self.check_conn(conn):
+            raise RuntimeError("章节信息访问出错。")
+        content = conn.text.encode("utf-8")
+        try:
+            xmlcontent = re.sub(re.compile('(<script.*?</script>)', re.S), '', content).strip()
+            xmlcontent = xmlcontent.decode("utf-8")
+            root = etree.HTML(xmlcontent).xpath('./body/ul')[0]
+        except Exception:
+            traceback.print_exc()
+            raise RuntimeError("解析章节信息出错")
+        chapters = root.xpath("./li")
+        chapter_info_list = list()
+        for chapter in chapters:
+            chapter_info = dict()
+            a = chapter.xpath("./a")[0]
+            chapter_info["pk"] = a.attrib.get("pk", "")
+            chapter_info["name"] = a.text.strip()
+            chapter_info["sessions"] = list()
+            sessions = chapter.xpath("./ul/li")
+            for session in sessions:
+                session_info = dict()
+                a = session.xpath("./a")[0]
+                session_info["pk"] = a.attrib.get("pk", "")
+                session_info["name"] = a.text.strip()
+                session_info["points"] = list()
+                points = session.xpath("./ul/li")
+                for point in points:
+                    point_info = dict()
+                    a = point.xpath("./a")[0]
+                    point_info["pk"] = a.attrib.get("pk", "")
+                    point_info["name"] = a.text.strip()
+                    session_info["points"].append(point_info)
+                chapter_info["sessions"].append(session_info)
+            chapter_info_list.append(chapter_info)
+        res = dict()
+        res["chapters"] = chapter_info_list
+        res["subject"] = job["subject"]
+        return res
+
+
     def get_chapter(self, job):
         edition_info = job["info"]
         grade_info_list = list()
         for grade_info in edition_info["grade"]:
-            if grade_info["grade_name"] not in ["七年级上", "七年级下", "八年级上", "八年级下", "九年级上", "九年级下"]:
-                continue
-            url = "http://www.jyeoo.com/math/ques/partialcategory?a=%s" % grade_info["real_id"]
+            #if grade_info["grade_name"] not in ["七年级上", "七年级下", "八年级上", "八年级下", "九年级上", "九年级下"]:
+            #    continue
+            base_url = job["base_url"][:job["base_url"].rfind("/")]
+            url = base_url+"/partialcategory?a=%s" % grade_info["real_id"]
             conn = self.request_url(url)
             if not self.check_conn(conn):
                 raise RuntimeError("章节信息访问出错。")
@@ -208,21 +293,21 @@ class JyeooSpider(CommonSpider):
             for chapter in chapters:
                 chapter_info = dict()
                 a = chapter.xpath("./a")[0]
-                chapter_info["pk"] = a.attrib["pk"]
+                chapter_info["pk"] = a.attrib.get("pk", "")
                 chapter_info["name"] = a.text.strip()
                 chapter_info["sessions"] = list()
                 sessions = chapter.xpath("./ul/li")
                 for session in sessions:
                     session_info = dict()
                     a = session.xpath("./a")[0]
-                    session_info["pk"] = a.attrib["pk"]
+                    session_info["pk"] = a.attrib.get("pk", "")
                     session_info["name"] = a.text.strip()
                     session_info["points"] = list()
                     points = session.xpath("./ul/li")
                     for point in points:
                         point_info = dict()
                         a = point.xpath("./a")[0]
-                        point_info["pk"] = a.attrib["pk"]
+                        point_info["pk"] = a.attrib.get("pk", "")
                         point_info["name"] = a.text.strip()
                         session_info["points"].append(point_info)
                     chapter_info["sessions"].append(session_info)
@@ -230,8 +315,17 @@ class JyeooSpider(CommonSpider):
             grade_info["chapters"] = chapter_info_list
             grade_info["edition"] = copy.deepcopy(edition_info)
             grade_info["edition"].pop("grade")
+            grade_info["subject"] = job["subject"]
             grade_info_list.append(grade_info)
         return grade_info_list
+
+    def get_login_session(self, acc, password):
+        if getattr(self, "sreq", None):
+            return self.sreq
+        sreq = JyeooLogin(acc, password)
+        sreq.login()
+        self.sreq = sreq
+        return sreq
 
     def request_url(self, url, **kwargs):
         sreq = getattr(self._tls, "sreq", None)
@@ -243,7 +337,7 @@ class JyeooSpider(CommonSpider):
             sreq.select_user_agent("firefox")
         kwargs.update({"timeout": 6})
         kwargs["proxy_credit"] = 1
-        kwargs.update({"proxies": self.proxy_pool.get_one()})
+        kwargs.update({"proxies": self.proxy_pool.get_one("bind")})
         conn = sreq.request_url(url, **kwargs)
         setattr(self._tls, 'sreq', sreq)
         return conn
@@ -252,11 +346,23 @@ class JyeooSpider(CommonSpider):
         if job["type"] == "getEdition":
             edition_info_list = self.get_editon(job)
             for edition_info in edition_info_list:
-                job = {"type": "getChapter", "info": edition_info, "subject": job["subject"]}
-                self.queue_manager.put_main_job(job)
+                job1 = {"type": "getChapter", "info": edition_info, "base_url":job["url"], "subject": job["subject"]}
+                self.queue_manager.put_main_job(job1)
+            job2 = {"type": "getPoint", "base_url":job["url"], "subject": job["subject"]}
+            self.queue_manager.put_main_job(job2)
+
+        elif job["type"] == "getPoint":
+            point_info_list = self.get_points(job)
+            self.saver.save_point(point_info_list)
+            return
 
         elif job["type"] == "getChapter":
             grade_info_list = self.get_chapter(job)
+            ##############
+            # 只爬章节
+            ##############
+            self.saver.save_chapter(grade_info_list)
+            return
             for grade_info in grade_info_list:
                 new_job = dict()
                 new_job["edition_name"], new_job["grade_id"], new_job["grade_name"], new_job["grade_real_id"] = \
@@ -299,19 +405,27 @@ class JyeooSpider(CommonSpider):
 
         elif job["type"] == "getQuestionDetail":
             url = job["url"]
+            url = re.sub(re.compile("(pi=\d+)", re.S), "pi=%d"%job["page"], url)
             data = job["ext_data"]
             # questions = job["questions"]
+            #sreq = self.get_login_session("sssysu_hanpy@163.com", "138138")
+            #p = Parser(self.proxy_pool, sreq)
             p = Parser(self.proxy_pool)
             pages = 1
             if job["page"] == 1:
-                questions, pages = p.parse(url, job=job, get_page=True)
+                questions, pages, curr_page = p.parse(url, job=job, get_page=True)
             else:
-                questions = p.parse(url, job=job)
+                questions, curr_page = p.parse(url, job=job)
+            if job["page"] != curr_page:
+                raise RuntimeError("req_page=%d, curr_page=%d, IP被封"%(job["page"], curr_page))
             for pg in range(2, pages + 1):
                 new_job = copy.deepcopy(job)
                 new_job["page"] = pg
+                new_job["first"] = questions[0]
+                new_job["notFirstPage"] = True
                 self.queue_manager.put_normal_job(new_job)
             self.saver.save_question_list(questions, data)
+            Log.error("save %d questions. curr_page:%d"%(len(questions), curr_page))
 
             # for question in questions:
             #     href = question["href"]
@@ -339,5 +453,5 @@ if __name__ == "__main__":
                       action="store_true", dest="is_rerun", default=False,
                       help="rerun flag")
     (options, args) = parser.parse_args()
-    s = JyeooSpider(10, rerun=options.is_rerun)
+    s = JyeooSpider(8, rerun=options.is_rerun)
     s.run()
