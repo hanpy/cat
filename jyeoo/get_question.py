@@ -361,8 +361,8 @@ class JyeooSpider(CommonSpider):
             ##############
             # 只爬章节
             ##############
-            self.saver.save_chapter(grade_info_list)
-            return
+            #self.saver.save_chapter(grade_info_list)
+            #return
             for grade_info in grade_info_list:
                 new_job = dict()
                 new_job["edition_name"], new_job["grade_id"], new_job["grade_name"], new_job["grade_real_id"] = \
